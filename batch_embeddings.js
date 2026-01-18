@@ -32,23 +32,40 @@ let stats = {
     startTime: Date.now()
 };
 
-async function getImageEmbedding(imageUrl) {
-    try {
-        const response = await fetch(`${IMAGE_SERVICE_URL}/generate-embedding`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image_url: imageUrl })
-        });
+async function getImageEmbedding(imageUrl, retries = 3) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            const response = await fetch(`${IMAGE_SERVICE_URL}/generate-embedding`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image_url: imageUrl })
+            });
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+            // Handle rate limit with retry
+            if (response.status === 429) {
+                const waitTime = Math.pow(2, attempt) * 2000; // 4s, 8s, 16s
+                console.log(`Rate limited (429). Waiting ${waitTime / 1000}s before retry ${attempt}/${retries}...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                continue;
+            }
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            if (attempt === retries) {
+                console.error(`Embedding error for ${imageUrl.substring(0, 50)}...: ${error.message} (after ${retries} attempts)`);
+                return null;
+            }
+            // Retry on network errors
+            const waitTime = Math.pow(2, attempt) * 1000;
+            console.log(`Error: ${error.message}. Retrying in ${waitTime / 1000}s (${attempt}/${retries})...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
         }
-
-        return await response.json();
-    } catch (error) {
-        console.error(`Embedding error for ${imageUrl.substring(0, 50)}...: ${error.message}`);
-        return null;
     }
+    return null;
 }
 
 async function processDocument(doc) {

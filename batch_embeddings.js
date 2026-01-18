@@ -61,14 +61,31 @@ async function processDocument(doc) {
         return;
     }
 
-    // Get first image URL
+    // Get images
     const images = source.snapshot?.images || [];
     if (!images.length) {
         stats.skipped++;
         return;
     }
 
-    const imageUrl = images[0].original_image_url || images[0].resized_image_url;
+    // Find best image URL - prefer DigitalOcean Spaces URLs
+    let imageUrl = null;
+    const img = images[0];
+    const urlOptions = [
+        img.resized_image_url,
+        img.original_image_url,
+        img.watermarked_resized_image_url
+    ].filter(Boolean);
+
+    // Prefer DigitalOcean Spaces URLs (accessible), skip Facebook CDN (403 errors)
+    for (const url of urlOptions) {
+        if (url.includes('digitaloceanspaces.com')) {
+            imageUrl = url;
+            break;
+        }
+    }
+
+    // Skip if no DigitalOcean Spaces URL available
     if (!imageUrl) {
         stats.skipped++;
         return;

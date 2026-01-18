@@ -34,7 +34,7 @@ let stats = {
 
 async function getImageEmbedding(imageUrl) {
     try {
-        const response = await fetch(`${IMAGE_SERVICE_URL}/embed`, {
+        const response = await fetch(`${IMAGE_SERVICE_URL}/generate-embedding`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ image_url: imageUrl })
